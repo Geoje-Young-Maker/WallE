@@ -1,2 +1,5 @@
+inc
+
 int main() {
+   
 }
