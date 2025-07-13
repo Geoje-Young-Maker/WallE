@@ -1,0 +1,20 @@
+Wall - E 기능
+
+
+- BASE = (Main 센서 처리 = 아두이노 MEGA, AI = 라즈베리 파이) 서로 시리얼 통신)
+- 기판은 Breadboard Style Prototype PCB Protobord 사는걸로 (근데 아두이노라면, 프로토 쉴드에 해도 될듯함 (메가용이 있으면..? ))
+- AI로 작동 **
+- 무한바퀴 궤도 ** (모든 전력은 릴레이 모듈로 켜고 끌 예정)
+- 넘어짐 감지(자이로 센서) -> Analog -> 아두이노 추천
+- 두드림 감지 (노크센서) -> Digital
+- 온습도 감지 (DHT 22) -> Serial
+- 디스플레이 (OLED or Other) -> Serial
+- 조도감지 (조도저항) -> Analog (Request Hardcoding)
+- 눈에 카메라 (???) -> 고민 필요
+- 관절 움직임(공업용 Servo) -> Analog (PWM available)
+
+Problem
+
+1. 무한 궤도
+2, 모터 파워문제
+3. AI
