@@ -12,6 +12,9 @@ Wall - E 기능
 - 조도감지 (조도저항) -> Analog (Request Hardcoding)
 - 눈에 카메라 (???) -> 고민 필요
 - 관절 움직임(공업용 Servo) -> Analog (PWM available)
+- 베터리 -> V, A 계산해야함
+- 
+
 
 Problem
 
