@@ -1,5 +1,0 @@
-inc
-
-int main() {
-   
-}
