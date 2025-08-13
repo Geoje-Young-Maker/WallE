@@ -7,5 +7,5 @@
 
 2025.08.13
 라즈베리 파이 새 아이디 및 암호
-ID: wallERP
-PW: wallERPpw
+ID: wallerp
+PW: wallerppw
