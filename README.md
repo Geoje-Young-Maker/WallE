@@ -4,3 +4,8 @@
 아두이노 코드는 여기있음
 
 [![Readme Card](https://github-readme-stats.vercel.app/api/pin/?username=Geoje-Young-Maker&repo=WallE-Arduino)](https://github.com/Geoje-Young-Maker/WallE-Arduino)
+
+2025.08.13
+라즈베리 파이 새 아이디 및 암호
+ID: wallERP
+PW: wallERPpw
