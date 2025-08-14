@@ -39,8 +39,6 @@ while True:
     frame = cam.capture_array()
     results = model(frame)
     boxes = results[0].boxes
-    if not data and not results: #데이터 들어올 때까지 반복
-        continue
 
     if data:
         #머신 러닝이 아닌 모션은 자연스러움을 더하기 위해 랜덤 모듈을 사용하는 게 좋을 듯.
