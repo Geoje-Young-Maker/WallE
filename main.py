@@ -39,10 +39,20 @@ while True:
     frame = cam.capture_array()
     results = model(frame)
     boxes = results[0].boxes
+    if not data and not results: #데이터 들어올 때까지 반복
+        continue
 
     if data:
         #머신 러닝이 아닌 모션은 자연스러움을 더하기 위해 랜덤 모듈을 사용하는 게 좋을 듯.
-        line = data.decode('utf-8', errors='replace').strip() #디코딩 및 공백문자 제거
+        line = data.decode('utf-8', errors='replace').strip().split(',') #디코딩 및 공백문자 제거
+
+        gyro = tuple(line[:3])
+        brightness = line[3]
+        dist = line[4:8]
+        temp = line[8]
+        humid = line[9]
+
+        #이하 코드 수정 필요!!!!!!!!!!!!!!!!!
         if line == "light_on": #조도 센서: 점등
             light(0)
         elif line == "light_off": #조도 센서: 소등
@@ -74,3 +84,6 @@ while True:
                 x1, y1, x2, y2 = xyxy
             else: # 사물
                 pass #일정 시간 주시 후 리턴하는 코드;
+
+            
+
