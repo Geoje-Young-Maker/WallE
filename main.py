@@ -10,7 +10,7 @@ import random
 model = YOLO('yolov8n.pt')
 
 #포트 연결
-sr = serial.Serial(port='', baudrate=0, timeout=1) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
+sr = serial.Serial(port='', baudrate=115200, timeout=0.02) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
 time.sleep(2) #연결 대기
 
 #월E 작동 함수
@@ -44,34 +44,45 @@ while True:
 
     if data:
         #머신 러닝이 아닌 모션은 자연스러움을 더하기 위해 랜덤 모듈을 사용하는 게 좋을 듯.
-        line = data.decode('utf-8', errors='replace').strip().split(',') #디코딩 및 공백문자 제거
+        line = eval(data.decode('utf-8', errors='replace').strip()) #디코딩 및 공백문자 제거 + eval()
 
-        gyro = tuple(line[:3])
-        brightness = line[3]
-        dist = line[4:8]
-        temp = line[8]
-        humid = line[9]
+        gyro = tuple(line[0])
+        brightness = line[1]
+        dist = tuple(line[2])
+        temp_humid = tuple(line[3])
 
-        #이하 코드 수정 필요!!!!!!!!!!!!!!!!!
-        if line == "light_on": #조도 센서: 점등
+        if brightness < 400: #조도 센서: 점등
             light(0)
-        elif line == "light_off": #조도 센서: 소등
+        elif brightness >= 400: #조도 센서: 소등
             light(1)
 
-        if line == "knock": #두드림(진동) 감지
+
+        #자이로 - 수정 필요
+        if gyro: #두드림(진동) 감지
             wakeup()
-        
-        if line[:8] == "distance": #초음파 센서 거리 값. 입력 형태는 달라질 수도 있음.
-            dist = float(line[8:])
-            if dist <= 10: #사물과의 거리가 10cm 이하일 때 (변경 가능)
-                #거리가 가까울 경우 할 수 있는 모션은 2가지
-                motion = random.randint(1, 2)
-                if motion == 1:
-                    turn(random.randint(-360, 360)) #무작위 방향, 각도로 회전
-                elif motion == 2:
-                    walk(-1, 1) #후진
-            else:
-                walk(1, 1) #전진 - 속도나 시간 등은 랜덤하게 변경 가능    
+
+
+        #초음파 센서 거리 값.
+        if dist[0] <= 15: #사물과의 거리가 15cm 이하일 때 (변경 가능)
+            #거리가 가까울 경우 할 수 있는 모션은 2가지
+            motion = random.randint(1, 2)
+            if motion == 1:
+                turn(random.randint(-360, 360)) #무작위 방향, 각도로 회전
+            elif motion == 2:
+                mx = 0
+                for i in dist: #가장 거리가 먼 방향 찾음 (곧, 좌우앞뒤 중 막히지 않았거나 그나마 가장 멀리 갈 수 있는 곳을 찾음)
+                    if (dist[mx] < dist[i]):
+                        mx = i
+                if mx == 1:
+                    turn(180)
+                elif mx == 2:
+                    turn(-90)
+                elif mx == 3:
+                    turn(90)
+                else: #그럴리는 없겠지만, 전방 거리가 가장 긴 경우 (월E가 갇힌 경우)
+                    turn(360)
+        else:
+            walk(1, 1) #전진 - 속도나 시간 등은 랜덤하게 변경 가능
     
     if results:
         #사람 인식 시 실행할 코드: 각 객체 상자의 (좌상단, 우하단) 좌표는 boxes list에 있음.
@@ -81,9 +92,9 @@ while True:
             
             if cls == 0:  # 사람
                 #객체의 상단 끝으로 카메라 각도 조절하는 코드;
-                x1, y1, x2, y2 = xyxy
+                x1, y1, x2, y2 = xyxy #사람 블록의 좌상단xy, 우하단 xy
+                #얼굴 쪽을 주시하기 위해, 실제 카메라가 이동해야할 좌표는 블록의 위쪽임. 
+                move_pos = tuple((x1+x2)/2, y1)
+
             else: # 사물
-                pass #일정 시간 주시 후 리턴하는 코드;
-
-            
-
+                time.sleep(random.randint(1,5)) #일정 시간 주시 후 리턴하는 코드;
