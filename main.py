@@ -95,6 +95,12 @@ while True:
                 x1, y1, x2, y2 = xyxy #사람 블록의 좌상단xy, 우하단 xy
                 #얼굴 쪽을 주시하기 위해, 실제 카메라가 이동해야할 좌표는 블록의 위쪽임. 
                 move_pos = tuple((x1+x2)/2, y1)
+                if move_pos[0] < 0:
+                    turn(10)
+                elif move_pos[0] > 0:
+                    turn(-10)
+                
+                if move_pos[1] #작업 중
 
             else: # 사물
                 time.sleep(random.randint(1,5)) #일정 시간 주시 후 리턴하는 코드;
