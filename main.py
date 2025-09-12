@@ -12,17 +12,18 @@ model = YOLO('yolov8n.pt')
 #포트 연결
 sr = serial.Serial(port='', baudrate=115200, timeout=0.02) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
 time.sleep(2) #연결 대기
+send[7] = []
 
 #월E 작동 함수
 def light(n): #불 키고 끄는 함수 (0: off, 1: on)
     if n == 0:
-        pass
+        send[6] = 0
     elif n == 1:
-        pass
+        send[6] = 1
 def wakeup(): #일어나는 모션
-    pass
+    pass 
 def walk(speed, time): #speed의 속도로 time동안 전진 (speed < 0: 후진)
-    pass
+    send[0] = 1
 def turn(degree): #degree의 각도로 회전 (+는 시계, -는 반시계)
     pass
 
