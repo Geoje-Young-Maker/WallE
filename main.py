@@ -12,7 +12,9 @@ model = YOLO('yolov8n.pt')
 #포트 연결
 sr = serial.Serial(port='', baudrate=115200, timeout=0.02) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
 time.sleep(2) #연결 대기
-send[7] = []
+
+#전송 리스트: 모터상태, 속도, 서보1각도, 속도, 서보2각도, 속도, 조도
+send = [0 for i in range(7)]
 
 #월E 작동 함수
 def light(n): #불 키고 끄는 함수 (0: off, 1: on)
@@ -22,10 +24,18 @@ def light(n): #불 키고 끄는 함수 (0: off, 1: on)
         send[6] = 1
 def wakeup(): #일어나는 모션
     pass 
-def walk(speed, time): #speed의 속도로 time동안 전진 (speed < 0: 후진)
-    send[0] = 1
+def walk(speed): #speed의 속도로 전진 (speed < 0: 후진)
+    if speed > 0: 
+        send[0] = 'F'
+        send[1] = speed
+    elif speed < 0:
+        send[0] = 'B'
+        send[1] = abs(speed)
 def turn(degree): #degree의 각도로 회전 (+는 시계, -는 반시계)
-    pass#한 바퀴 도는 데 걸리는 시간을 n초라 할 때, a도 회전은 동일 속도에서 a/360 * n초간 회전시키면 됨.
+    if degree > 0:
+        send[0] = 'R' + degree
+    elif degree < 0:
+        send[0] = 'L' + abs(degree)
 
 
 #카메라: 사람 & 사물 인식 (반복 실행)
@@ -36,6 +46,7 @@ cam.start()
 
 #시리얼 데이터 입력
 while True:
+    send = [0 for i in range(7)]
     data = sr.readline()
     frame = cam.capture_array()
     results = model(frame)
@@ -101,7 +112,11 @@ while True:
                 elif move_pos[0] > 0:
                     turn(-10)
                 
-                if move_pos[1] #작업 중
-
+                if move_pos[1] > 0:
+                    pass #작업 중 - 얼굴 각도는 어떤 모터로 조절...?
+                    
             else: # 사물
                 time.sleep(random.randint(1,5)) #일정 시간 주시 후 리턴하는 코드;
+
+    send_data = ",".join(map(str, send)) + "\n"
+    sr.write(send_data.encode("utf-8")) #데이터들을 쉼표로 구분해 전송
