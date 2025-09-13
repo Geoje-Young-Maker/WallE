@@ -25,7 +25,7 @@ def wakeup(): #일어나는 모션
 def walk(speed, time): #speed의 속도로 time동안 전진 (speed < 0: 후진)
     send[0] = 1
 def turn(degree): #degree의 각도로 회전 (+는 시계, -는 반시계)
-    pass
+    pass#한 바퀴 도는 데 걸리는 시간을 n초라 할 때, a도 회전은 동일 속도에서 a/360 * n초간 회전시키면 됨.
 
 
 #카메라: 사람 & 사물 인식 (반복 실행)
