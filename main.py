@@ -8,12 +8,14 @@ import random
 
 #딥러닝 모델 (가벼운 버전)
 model = YOLO('yolov8n.pt')
+model.export(format="tflite", int8=True)
+#라즈베리 파이에선 터미널로 tflite-runtime 다운로드하기
 
 #포트 연결
 sr = serial.Serial(port='', baudrate=115200, timeout=0.02) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
 time.sleep(2) #연결 대기
 
-#전송 리스트: 모터상태, 속도, 서보1각도, 속도, 서보2각도, 속도, 조도
+#전송 리스트: 모터상태, 시간, 서보1각도, 속도, 서보2각도, 속도, 조도
 send = [0 for i in range(7)]
 
 #월E 작동 함수
@@ -27,15 +29,27 @@ def wakeup(): #일어나는 모션
 def walk(speed): #speed의 속도로 전진 (speed < 0: 후진)
     if speed > 0: 
         send[0] = 'F'
-        send[1] = speed
+        send[1] = 0.5
     elif speed < 0:
         send[0] = 'B'
-        send[1] = abs(speed)
+        send[1] = 0.5
+T = 3 #월E가 360도 회전하는 데 걸리는 시간
+servo = 0 #현재 서보모터 각도
 def turn(degree): #degree의 각도로 회전 (+는 시계, -는 반시계)
-    if degree > 0:
-        send[0] = 'R' + degree
-    elif degree < 0:
-        send[0] = 'L' + abs(degree)
+    if abs(servo + degree) < 45: #좌우 45도까지는 고개를 돌리고, 그보다 더 돌릴 시 몸을 회전시킴.
+        send[4] = degree
+        send[5] = 1 #속도
+        servo += degree
+    else: 
+        if degree > 0:
+            send[0] = 'R' #신체 회전
+            send[1] = T * degree / 360
+        elif degree < 0:
+            send[0] = 'L'
+            send[1] = T * abs(degree) / 360
+        send[4] = -servo #목 각도 원점으로
+        send[5] = 1
+        servo = 0
 
 
 #카메라: 사람 & 사물 인식 (반복 실행)
@@ -68,12 +82,6 @@ while True:
         elif brightness >= 400: #조도 센서: 소등
             light(1)
 
-
-        #자이로 - 수정 필요
-        if gyro: #두드림(진동) 감지
-            wakeup()
-
-
         #초음파 센서 거리 값.
         if dist[0] <= 15: #사물과의 거리가 15cm 이하일 때 (변경 가능)
             #거리가 가까울 경우 할 수 있는 모션은 2가지
@@ -94,7 +102,7 @@ while True:
                 else: #그럴리는 없겠지만, 전방 거리가 가장 긴 경우 (월E가 갇힌 경우)
                     turn(360)
         else:
-            walk(1, 1) #전진 - 속도나 시간 등은 랜덤하게 변경 가능
+            walk(1) #전진 - 속도나 시간 등은 랜덤하게 변경 가능
     
     if results:
         #사람 인식 시 실행할 코드: 각 객체 상자의 (좌상단, 우하단) 좌표는 boxes list에 있음.
@@ -103,17 +111,21 @@ while True:
             cls = int(box.cls[0].cpu().numpy())
             
             if cls == 0:  # 사람
+                act = random.randint(0, 100)
                 #객체의 상단 끝으로 카메라 각도 조절하는 코드;
                 x1, y1, x2, y2 = xyxy #사람 블록의 좌상단xy, 우하단 xy
                 #얼굴 쪽을 주시하기 위해, 실제 카메라가 이동해야할 좌표는 블록의 위쪽임. 
                 move_pos = tuple((x1+x2)/2, y1)
                 if move_pos[0] < 0:
-                    turn(10)
+                    turn(10) #매 실행마다 작동 - 각 상태에 따라 회전을 반복함.
                 elif move_pos[0] > 0:
                     turn(-10)
                 
                 if move_pos[1] > 0:
-                    pass #작업 중 - 얼굴 각도는 어떤 모터로 조절...?
+                    send[2] = 10
+                elif move_pos[1] < 0:
+                    send[2] = -10
+                send[3] = 1
                     
             else: # 사물
                 time.sleep(random.randint(1,5)) #일정 시간 주시 후 리턴하는 코드;
