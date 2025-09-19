@@ -1,18 +1,25 @@
-from picamera2 import Picamera2 #type: ignore (에러 무시 - picamera는 리눅스 전용 모듈임.)
-from ultralytics import YOLO
+from picamera2 import Picamera2
+import tflite_runtime.interpreter as tflite 
+#sudo apt update
+#sudo apt install python3-pip -y
+#pip install --upgrade pip
+#pip install --extra-index-url https://google-coral.github.io/py-repo/ tflite-runtime -> 라즈베리파이 터미널에서. 
 import serial
 import time
 import random
+import numpy as np
 
 ### VNC에서 프로그램 실행 전 터미널에 source myenv/bin/activate로 가상환경 활성화하기 ###
 
 #딥러닝 모델 (가벼운 버전)
-model = YOLO('yolov8n.pt')
-model.export(format="tflite", int8=True)
-#라즈베리 파이에선 터미널로 tflite-runtime 다운로드하기
+interpreter = tflite.Interpreter(model_path="yolov8n_int8.tflite")
+interpreter.allocate_tensors()
+
+input_details = interpreter.get_input_details()
+output_details = interpreter.get_output_details()
 
 #포트 연결
-sr = serial.Serial(port='', baudrate=115200, timeout=0.02) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
+sr = serial.Serial(port='', baudrate=115200, timeout=0.1) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
 time.sleep(2) #연결 대기
 
 #전송 리스트: 모터상태, 시간, 서보1각도, 속도, 서보2각도, 속도, 조도
@@ -36,6 +43,7 @@ def walk(speed): #speed의 속도로 전진 (speed < 0: 후진)
 T = 3 #월E가 360도 회전하는 데 걸리는 시간
 servo = 0 #현재 서보모터 각도
 def turn(degree): #degree의 각도로 회전 (+는 시계, -는 반시계)
+    global servo
     if abs(servo + degree) < 45: #좌우 45도까지는 고개를 돌리고, 그보다 더 돌릴 시 몸을 회전시킴.
         send[4] = degree
         send[5] = 1 #속도
@@ -54,7 +62,7 @@ def turn(degree): #degree의 각도로 회전 (+는 시계, -는 반시계)
 
 #카메라: 사람 & 사물 인식 (반복 실행)
 cam = Picamera2()
-preview_config = cam.create_preview_configuration(main={"size": (640, 480)})
+preview_config = cam.create_preview_configuration(main={"size": (320, 320)})
 cam.configure(preview_config)
 cam.start()
 
@@ -62,10 +70,20 @@ cam.start()
 while True:
     send = [0 for i in range(7)]
     data = sr.readline()
+
     frame = cam.capture_array()
-    results = model(frame)
-    boxes = results[0].boxes
-    if not data and not results: #데이터 들어올 때까지 반복
+    img_norm = frame / 255.0
+    input_data = np.expand_dims(img_norm.astype(np.float32), axis=0)
+
+    interpreter.set_tensor(input_details[0]['index'], input_data)
+    interpreter.invoke()
+
+    boxes = interpreter.get_tensor(output_details[0]['index'])[0]
+    boxes = boxes[0] if boxes.ndim == 3 else boxes
+    scores = interpreter.get_tensor(output_details[1]['index'])[0]
+    classes = interpreter.get_tensor(output_details[2]['index'])[0]
+
+    if not data and boxes.shape[0] == 0: #데이터 들어올 때까지 반복
         continue
 
     if data:
@@ -104,31 +122,33 @@ while True:
         else:
             walk(1) #전진 - 속도나 시간 등은 랜덤하게 변경 가능
     
-    if results:
+    if boxes.shape[0] != 0:
         #사람 인식 시 실행할 코드: 각 객체 상자의 (좌상단, 우하단) 좌표는 boxes list에 있음.
-        for box in boxes:
-            xyxy = box.xyxy[0].cpu().numpy()
-            cls = int(box.cls[0].cpu().numpy())
+        for i in range(len(boxes)):
+            xyxy = boxes[i]
+            cls = classes[i]
             
-            if cls == 0:  # 사람
+            if cls == 0 and scores[i] > 0.5:  # 사람
                 act = random.randint(0, 100)
                 #객체의 상단 끝으로 카메라 각도 조절하는 코드;
-                x1, y1, x2, y2 = xyxy #사람 블록의 좌상단xy, 우하단 xy
+                H, W = frame.shape[:2]
+                x1, y1, x2, y2 = xyxy
+                x1, y1, x2, y2 = int(x1*W), int(y1*H), int(x2*W), int(y2*H) #사람 블록의 좌상단xy, 우하단 xy
                 #얼굴 쪽을 주시하기 위해, 실제 카메라가 이동해야할 좌표는 블록의 위쪽임. 
-                move_pos = tuple((x1+x2)/2, y1)
-                if move_pos[0] < 0:
+                move_pos = ((x1+x2)/2, y1)
+                if move_pos[0] - W/2 < 0:
                     turn(10) #매 실행마다 작동 - 각 상태에 따라 회전을 반복함.
-                elif move_pos[0] > 0:
+                elif move_pos[0] - W/2 > 0:
                     turn(-10)
                 
-                if move_pos[1] > 0:
-                    send[2] = 10
-                elif move_pos[1] < 0:
+                if move_pos[1] - H/2 > 0:
                     send[2] = -10
+                elif move_pos[1] - H/2 < 0:
+                    send[2] = 10
                 send[3] = 1
                     
             else: # 사물
-                time.sleep(random.randint(1,5)) #일정 시간 주시 후 리턴하는 코드;
+                    time.sleep(random.randint(1,5)) #일정 시간 주시 후 리턴하는 코드;
 
     send_data = ",".join(map(str, send)) + "\n"
     sr.write(send_data.encode("utf-8")) #데이터들을 쉼표로 구분해 전송
