@@ -12,6 +12,12 @@ import numpy as np
 ### VNC에서 프로그램 실행 전 터미널에 source myenv/bin/activate로 가상환경 활성화하기 ###
 
 
+#카메라: 사람 & 사물 인식 (반복 실행)
+cam = Picamera2()
+preview_config = cam.create_video_configuration(main={"size": (320, 320)})
+cam.configure(preview_config)
+cam.start()
+
 
 #딥러닝 모델 (가벼운 버전)
 interpreter = tflite.Interpreter(model_path="yolov8n_int8.tflite")
@@ -21,7 +27,7 @@ input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
 #포트 연결
-sr = serial.Serial(port='', baudrate=115200, timeout=0.1) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
+sr = serial.Serial(port='/dev/ttyACM0', baudrate=115200, timeout=0.1) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
 time.sleep(2) #연결 대기
 
 #전송 리스트: 모터상태, 시간, 서보1각도, 속도, 서보2각도, 속도, 조도
@@ -62,11 +68,6 @@ def turn(degree): #degree의 각도로 회전 (+는 시계, -는 반시계)
         servo = 0
 
 
-#카메라: 사람 & 사물 인식 (반복 실행)
-cam = Picamera2()
-preview_config = cam.create_preview_configuration(main={"size": (320, 320)})
-cam.configure(preview_config)
-cam.start()
 
 #시리얼 데이터 입력
 while True:
@@ -74,11 +75,17 @@ while True:
     data = sr.readline()
 
     frame = cam.capture_array()
+    frame = frame[:, :, :3]
     img_norm = frame / 255.0
     input_data = np.expand_dims(img_norm.astype(np.float32), axis=0)
 
+
     interpreter.set_tensor(input_details[0]['index'], input_data)
     interpreter.invoke()
+    
+    for i, j in enumerate(output_details):
+        out = interpreter.get_tensor(j['index'])
+        print(f"output {i}: shape={out.shape}, dtype={out.dtype}")
 
     boxes = interpreter.get_tensor(output_details[0]['index'])[0]
     boxes = boxes[0] if boxes.ndim == 3 else boxes
