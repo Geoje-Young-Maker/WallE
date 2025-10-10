@@ -7,9 +7,42 @@ import tflite_runtime.interpreter as tflite
 import serial
 import time
 import random
+#TODO! ERROR!
+"""
+
+A module that was compiled using NumPy 1.x cannot be run in
+NumPy 2.3.3 as it may crash. To support both 1.x and 2.x
+versions of NumPy, modules must be compiled with NumPy 2.0.
+Some module may need to rebuild instead e.g. with 'pybind11>=2.12'.
+
+If you are a user of the module, the easiest solution will be to
+downgrade to 'numpy<2' or try to upgrade the affected module.
+We expect that some modules will need time to support NumPy 2.
+
+Traceback (most recent call last):  File "/home/wallerp/WallE/main.py", line 15, in <module>
+    interpreter = tflite.Interpreter(model_path="yolov8n_int8.tflite")
+  File "/home/wallerp/WallE/venv/lib/python3.11/site-packages/tflite_runtime/interpreter.py", line 464, in __init__
+    self._interpreter = _interpreter_wrapper.CreateWrapperFromFile(
+AttributeError: _ARRAY_API not found
+ImportError: numpy.core.multiarray failed to import
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/wallerp/WallE/main.py", line 15, in <module>
+    interpreter = tflite.Interpreter(model_path="yolov8n_int8.tflite")
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/wallerp/WallE/venv/lib/python3.11/site-packages/tflite_runtime/interpreter.py", line 464, in __init__
+    self._interpreter = _interpreter_wrapper.CreateWrapperFromFile(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+SystemError: <built-in method CreateWrapperFromFile of PyCapsule object at 0x7fff1cd187b0> returned a result with an exception set
+
+"""
 import numpy as np
 
 ### VNC에서 프로그램 실행 전 터미널에 source myenv/bin/activate로 가상환경 활성화하기 ###
+
+
 
 #딥러닝 모델 (가벼운 버전)
 interpreter = tflite.Interpreter(model_path="yolov8n_int8.tflite")
