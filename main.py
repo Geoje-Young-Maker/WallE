@@ -1,23 +1,15 @@
 from picamera2 import Picamera2
-import tflite_runtime.interpreter as tflite 
+import tflite_runtime.interpreter as tflite
 #sudo apt update
 #sudo apt install python3-pip -y
 #pip install --upgrade pip
 #pip install --extra-index-url https://google-coral.github.io/py-repo/ tflite-runtime -> 라즈베리파이 터미널에서. 
 import serial
 import time
-import random 
+import random
 import numpy as np
 
 ### VNC에서 프로그램 실행 전 터미널에 source myenv/bin/activate로 가상환경 활성화하기 ###
-
-
-#카메라: 사람 & 사물 인식 (반복 실행)
-cam = Picamera2()
-preview_config = cam.create_video_configuration(main={"size": (320, 320)})
-cam.configure(preview_config)
-cam.start()
-
 
 #딥러닝 모델 (가벼운 버전)
 interpreter = tflite.Interpreter(model_path="yolov8n_int8.tflite")
@@ -26,71 +18,75 @@ interpreter.allocate_tensors()
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
+#사물 코드에 대응되는 라벨
+labels = [
+    "person", "bicycle", "car", "motorcycle", "airplane", "bus", "train",
+    "truck", "boat", "traffic light", "fire hydrant", "stop sign",
+    "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow",
+    "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella",
+    "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard",
+    "sports ball", "kite", "baseball bat", "baseball glove", "skateboard",
+    "surfboard", "tennis racket", "bottle", "wine glass", "cup", "fork",
+    "knife", "spoon", "bowl", "banana", "apple", "sandwich", "orange",
+    "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
+    "couch", "potted plant", "bed", "dining table", "toilet", "TV",
+    "laptop", "mouse", "remote", "keyboard", "cell phone", "microwave",
+    "oven", "toaster", "sink", "refrigerator", "book", "clock", "vase",
+    "scissors", "teddy bear", "hair drier", "toothbrush"
+]
+
 #포트 연결
-sr = serial.Serial(port='/dev/ttyACM0', baudrate=115200, timeout=0.1) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
+sr = serial.Serial(port='', baudrate=115200, timeout=0.1) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
 time.sleep(2) #연결 대기
 
-#전송 리스트: 모터상태, 시간, 서보1각도, 속도, 서보2각도, 속도, 조도
-send = [0 for i in range(7)]
+#전송 리스트: 모터상태, 속도, LCD
+send = [0 for i in range(3)]
 
 #월E 작동 함수
-def light(n): #불 키고 끄는 함수 (0: off, 1: on)
-    if n == 0:
-        send[6] = 0
-    elif n == 1:
-        send[6] = 1
 def wakeup(): #일어나는 모션
     pass 
 def walk(speed): #speed의 속도로 전진 (speed < 0: 후진)
+    global send
     if speed > 0: 
-        send[0] = 'F'
-        send[1] = 0.5
+        send[0] = '1'
+        send[1] = speed
     elif speed < 0:
-        send[0] = 'B'
-        send[1] = 0.5
-T = 3 #월E가 360도 회전하는 데 걸리는 시간
-servo = 0 #현재 서보모터 각도
+        send[0] = '2'
+        send[1] = -speed
 def turn(degree): #degree의 각도로 회전 (+는 시계, -는 반시계)
-    global servo
-    if abs(servo + degree) < 45: #좌우 45도까지는 고개를 돌리고, 그보다 더 돌릴 시 몸을 회전시킴.
-        send[4] = degree
-        send[5] = 1 #속도
-        servo += degree
-    else: 
-        if degree > 0:
-            send[0] = 'R' #신체 회전
-            send[1] = T * degree / 360
-        elif degree < 0:
-            send[0] = 'L'
-            send[1] = T * abs(degree) / 360
-        send[4] = -servo #목 각도 원점으로
-        send[5] = 1
-        servo = 0
+    global send
+    if degree > 0:
+        send[0] = '3' #우회전
+        send[1] = degree / 360
+    elif degree < 0:
+        send[0] = '4' #좌회전
+        send[1] = abs(degree) / 360
 
-
+#카메라: 사람 & 사물 인식 (반복 실행)
+cam = Picamera2()
+preview_config = cam.create_preview_configuration(main={"size": (320, 320)})
+cam.configure(preview_config)
+cam.start()
 
 #시리얼 데이터 입력
 while True:
-    send = [0 for i in range(7)]
+    send = [0 for i in range(3)]
     data = sr.readline()
 
     frame = cam.capture_array()
-    frame = frame[:, :, :3]
-    img_norm = frame / 255.0
-    input_data = np.expand_dims(img_norm.astype(np.float32), axis=0)
-
+    input_dtype = input_details[0]['dtype'] 
+    if input_dtype == np.float32: #타입이 float인 경우만 float으로 입력
+        input_data = np.expand_dims(frame / 255.0, axis=0).astype(np.float32)
+    else:
+        input_data = np.expand_dims(frame, axis=0).astype(np.uint8)
 
     interpreter.set_tensor(input_details[0]['index'], input_data)
     interpreter.invoke()
-    
-    for i, j in enumerate(output_details):
-        out = interpreter.get_tensor(j['index'])
-        print(f"output {i}: shape={out.shape}, dtype={out.dtype}")
 
-    boxes = interpreter.get_tensor(output_details[0]['index'])[0]
-    boxes = boxes[0] if boxes.ndim == 3 else boxes
-    scores = interpreter.get_tensor(output_details[1]['index'])[0]
-    classes = interpreter.get_tensor(output_details[2]['index'])[0]
+    output = interpreter.get_tensor(output_details[0]['index'])[0]
+    boxes = output[:, :4] #4번째까지는 객체의 xywh좌표, 이후엔 80개의 클래스 정보 (아마도?) -> 4번째 기준으로 슬라이싱
+    scores = np.max(output[:, 4:], axis=1)
+    classes = np.argmax(output[:, 4:], axis=1)
 
     if not data and boxes.shape[0] == 0: #데이터 들어올 때까지 반복
         continue
@@ -98,16 +94,7 @@ while True:
     if data:
         #머신 러닝이 아닌 모션은 자연스러움을 더하기 위해 랜덤 모듈을 사용하는 게 좋을 듯.
         line = eval(data.decode('utf-8', errors='replace').strip()) #디코딩 및 공백문자 제거 + eval()
-
-        gyro = tuple(line[0])
-        brightness = line[1]
-        dist = tuple(line[2])
-        temp_humid = tuple(line[3])
-
-        if brightness < 400: #조도 센서: 점등
-            light(0)
-        elif brightness >= 400: #조도 센서: 소등
-            light(1)
+        dist = (line[0], line[1])
 
         #초음파 센서 거리 값.
         if dist[0] <= 15: #사물과의 거리가 15cm 이하일 때 (변경 가능)
@@ -116,48 +103,31 @@ while True:
             if motion == 1:
                 turn(random.randint(-360, 360)) #무작위 방향, 각도로 회전
             elif motion == 2:
-                mx = 0
-                for i in dist: #가장 거리가 먼 방향 찾음 (곧, 좌우앞뒤 중 막히지 않았거나 그나마 가장 멀리 갈 수 있는 곳을 찾음)
-                    if (dist[mx] < dist[i]):
-                        mx = i
-                if mx == 1:
+                if dist[1] > dist[0]:
                     turn(180)
-                elif mx == 2:
-                    turn(-90)
-                elif mx == 3:
-                    turn(90)
-                else: #그럴리는 없겠지만, 전방 거리가 가장 긴 경우 (월E가 갇힌 경우)
-                    turn(360)
         else:
-            walk(1) #전진 - 속도나 시간 등은 랜덤하게 변경 가능
+            walk(0.5) #전진 - 속도나 시간 등은 랜덤하게 변경 가능
     
     if boxes.shape[0] != 0:
         #사람 인식 시 실행할 코드: 각 객체 상자의 (좌상단, 우하단) 좌표는 boxes list에 있음.
+        max_score = 0
         for i in range(len(boxes)):
-            xyxy = boxes[i]
+            xywh = boxes[i]
             cls = classes[i]
+            if scores[i] > scores[max_score]:
+                max_score = i
             
             if cls == 0 and scores[i] > 0.5:  # 사람
-                act = random.randint(0, 100)
-                #객체의 상단 끝으로 카메라 각도 조절하는 코드;
-                H, W = frame.shape[:2]
-                x1, y1, x2, y2 = xyxy
-                x1, y1, x2, y2 = int(x1*W), int(y1*H), int(x2*W), int(y2*H) #사람 블록의 좌상단xy, 우하단 xy
-                #얼굴 쪽을 주시하기 위해, 실제 카메라가 이동해야할 좌표는 블록의 위쪽임. 
-                move_pos = ((x1+x2)/2, y1)
-                if move_pos[0] - W/2 < 0:
+                if xywh[0] > 0.5:
                     turn(10) #매 실행마다 작동 - 각 상태에 따라 회전을 반복함.
-                elif move_pos[0] - W/2 > 0:
+                elif xywh[0] < 0.5:
                     turn(-10)
-                
-                if move_pos[1] - H/2 > 0:
-                    send[2] = -10
-                elif move_pos[1] - H/2 < 0:
-                    send[2] = 10
-                send[3] = 1
                     
-            else: # 사물
-                    time.sleep(random.randint(1,5)) #일정 시간 주시 후 리턴하는 코드;
+            elif scores[i] > 0.5: # 사물
+                time.sleep(random.randint(1,5)) #일정 시간 주시 후 리턴하는 코드;
+        
+        if scores[max_score] > 0.5:
+            send[2] = labels[int(classes[max_score])]
 
     send_data = ",".join(map(str, send)) + "\n"
     sr.write(send_data.encode("utf-8")) #데이터들을 쉼표로 구분해 전송
