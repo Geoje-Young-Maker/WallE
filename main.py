@@ -36,7 +36,7 @@ labels = [
 ]
 
 #포트 연결
-sr = serial.Serial(port='', baudrate=115200, timeout=0.1) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
+sr = serial.Serial(port='/dev/ttyACM0', baudrate=115200, timeout=0.1) #baudrate: 통신 속도, 아두이노와 같은 값이어야 함.
 time.sleep(2) #연결 대기
 
 #전송 리스트: 모터상태, 속도, LCD
@@ -74,6 +74,7 @@ while True:
     data = sr.readline()
 
     frame = cam.capture_array()
+    frame = frame[:, :, :3]
     input_dtype = input_details[0]['dtype'] 
     if input_dtype == np.float32: #타입이 float인 경우만 float으로 입력
         input_data = np.expand_dims(frame / 255.0, axis=0).astype(np.float32)

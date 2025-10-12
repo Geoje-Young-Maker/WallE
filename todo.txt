@@ -32,3 +32,10 @@ Problem
 3-2. 그와 동시에 얼굴이 인식될때까지 카메라 각도 상승.
 3-3. 얼굴의 좌표를 중앙에 유지한 채 카메라 회전, 
 일정 시간 지난 후 카메라 복귀, 주시 종료
+
+Traceback (most recent call last):
+  File "/home/wallerp/WallE/main.py", line 131, in <module>
+    send[2] = labels[int(classes[max_score])]
+              ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+IndexError: list index out of range
+
