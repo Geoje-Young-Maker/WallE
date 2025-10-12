@@ -71,7 +71,7 @@ cam.start()
 #시리얼 데이터 입력
 while True:
     send = [0 for i in range(3)]
-    data = sr.readline()
+    # data = sr.readline()
 
     frame = cam.capture_array()
     frame = frame[:, :, :3]
@@ -86,9 +86,12 @@ while True:
 
     output = interpreter.get_tensor(output_details[0]['index'])[0]
     boxes = output[:, :4] #4번째까지는 객체의 xywh좌표, 이후엔 80개의 클래스 정보 (아마도?) -> 4번째 기준으로 슬라이싱
-    scores = np.max(output[:, 4:], axis=1)
-    classes = np.argmax(output[:, 4:], axis=1)
-
+    objectness = output[:, 4]
+    class_logits = output[:, 5:]
+    scores = objectness * np.max(class_logits, axis=1)
+    classes = np.argmax(class_logits, axis=1)
+    
+    """
     if not data and boxes.shape[0] == 0: #데이터 들어올 때까지 반복
         continue
 
@@ -108,7 +111,7 @@ while True:
                     turn(180)
         else:
             walk(0.5) #전진 - 속도나 시간 등은 랜덤하게 변경 가능
-    
+    """
     if boxes.shape[0] != 0:
         #사람 인식 시 실행할 코드: 각 객체 상자의 (좌상단, 우하단) 좌표는 boxes list에 있음.
         max_score = 0
@@ -118,17 +121,26 @@ while True:
             if scores[i] > scores[max_score]:
                 max_score = i
             
-            if cls == 0 and scores[i] > 0.5:  # 사람
-                if xywh[0] > 0.5:
+            if cls == 0 and scores[i] > 0.3:  # 사람
+                if xywh[0] > 0.3:
                     turn(10) #매 실행마다 작동 - 각 상태에 따라 회전을 반복함.
-                elif xywh[0] < 0.5:
+                elif xywh[0] < 0.3:
                     turn(-10)
                     
-            elif scores[i] > 0.5: # 사물
+            elif scores[i] > 0.3: # 사물
                 time.sleep(random.randint(1,5)) #일정 시간 주시 후 리턴하는 코드;
         
-        if scores[max_score] > 0.5:
-            send[2] = labels[int(classes[max_score])]
+        print(scores[max_score])
+        if scores[max_score] > 0.3:
+            clsidx = int(classes[max_score])
+            print(clsidx)
+            
+            if clsidx < len(labels):
+                print(labels[clsidx])
+                send[2] = labels[clsidx]
+            else:
+                print("idk")
+            
 
     send_data = ",".join(map(str, send)) + "\n"
     sr.write(send_data.encode("utf-8")) #데이터들을 쉼표로 구분해 전송
