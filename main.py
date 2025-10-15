@@ -71,7 +71,7 @@ cam.start()
 #시리얼 데이터 입력
 while True:
     send = [0 for i in range(3)]
-    # data = sr.readline()
+    data = sr.readline()
 
     frame = cam.capture_array()
     frame = frame[:, :, :3]
