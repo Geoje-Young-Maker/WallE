@@ -91,7 +91,7 @@ while True:
     scores = objectness * np.max(class_logits, axis=1)
     classes = np.argmax(class_logits, axis=1)
     
-    """
+    
     if not data and boxes.shape[0] == 0: #데이터 들어올 때까지 반복
         continue
 
@@ -101,7 +101,7 @@ while True:
         dist = (line[0], line[1])
 
         #초음파 센서 거리 값.
-        if dist[0] <= 15: #사물과의 거리가 15cm 이하일 때 (변경 가능)
+        if dist[0] <= 10 or dist[1] <= 10: #사물과의 거리가 15cm 이하일 때 (변경 가능)
             #거리가 가까울 경우 할 수 있는 모션은 2가지
             motion = random.randint(1, 2)
             if motion == 1:
@@ -109,9 +109,10 @@ while True:
             elif motion == 2:
                 if dist[1] > dist[0]:
                     turn(180)
+                else turn(-180)
         else:
             walk(0.5) #전진 - 속도나 시간 등은 랜덤하게 변경 가능
-    """
+    
     if boxes.shape[0] != 0:
         #사람 인식 시 실행할 코드: 각 객체 상자의 (좌상단, 우하단) 좌표는 boxes list에 있음.
         max_score = 0
